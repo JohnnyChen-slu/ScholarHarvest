@@ -59,20 +59,21 @@
             statusDiv.style.display = 'block';
             statusDiv.textContent = 'Scraping in progress...';
             searchForm.querySelector('button').disabled = true;
-
+        
             const keyword = encodeURIComponent(document.getElementById('keyword').value);
             const startYear = document.getElementById('startYear').value;
             const endYear = document.getElementById('endYear').value;
-
+        
             const totalRecords = 200;
             const breakTime = 3000; // 3 seconds
             const results = [];
-
+        
             for (let start = 0; start < totalRecords; start += 10) {
-                const url = `https://scholar.google.com/scholar?as_vis=1&start=${start}&q=%22${keyword}%22&hl=en&as_sdt=1,31&as_ylo=${startYear}&as_yhi=${endYear}`;
+                const scholarUrl = `https://scholar.google.com/scholar?as_vis=1&start=${start}&q=%22${keyword}%22&hl=en&as_sdt=1,31&as_ylo=${startYear}&as_yhi=${endYear}`;
+                const proxyUrl = `/api/proxy?url=${encodeURIComponent(scholarUrl)}`;
                 
                 try {
-                    const response = await fetch(url);
+                    const response = await fetch(proxyUrl);
                     const html = await response.text();
                     const parsedResults = parseGoogleScholarResults(html);
                     results.push(...parsedResults);
@@ -85,7 +86,7 @@
                     console.error('Error fetching data:', error);
                 }
             }
-
+        
             displayResults(results);
             searchForm.querySelector('button').disabled = false;
             statusDiv.textContent = 'Scraping completed!';
