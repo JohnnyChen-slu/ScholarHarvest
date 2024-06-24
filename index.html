@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Scholar Scraper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Google Scholar Scraper</h1>
+    <button id="scrapeButton">Start Scraping</button>
+    <div id="status"></div>
+    <div id="results"></div>
+
+    <script>
+        const scrapeButton = document.getElementById('scrapeButton');
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+
+        scrapeButton.addEventListener('click', startScraping);
+
+        async function startScraping() {
+            statusDiv.textContent = 'Scraping in progress...';
+            scrapeButton.disabled = true;
+
+            const totalRecords = 200;
+            const breakTime = 3000; // 3 seconds
+            const results = [];
+
+            for (let start = 0; start < totalRecords; start += 10) {
+                const url = `https://scholar.google.com/scholar?as_vis=1&start=${start}&q=%22TBtools%22&hl=en&as_sdt=1,31&as_ylo=2016`;
+                
+                try {
+                    const response = await fetch(url);
+                    const html = await response.text();
+                    const parsedResults = parseGoogleScholarResults(html);
+                    results.push(...parsedResults);
+                    
+                    statusDiv.textContent = `Scraped ${results.length} results...`;
+                    
+                    // Respect robots.txt with a delay
+                    await new Promise(resolve => setTimeout(resolve, breakTime));
+                } catch (error) {
+                    console.error('Error fetching data:', error);
+                }
+            }
+
+            displayResults(results);
+            scrapeButton.disabled = false;
+            statusDiv.textContent = 'Scraping completed!';
+        }
+
+        function parseGoogleScholarResults(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const results = [];
+
+            doc.querySelectorAll('.gs_r').forEach(item => {
+                const titleElement = item.querySelector('.gs_rt');
+                const infoElement = item.querySelector('.gs_a');
+                const snippetElement = item.querySelector('.gs_rs');
+
+                if (titleElement && infoElement && snippetElement) {
+                    const title = titleElement.textContent.trim();
+                    const info = infoElement.textContent.trim();
+                    const snippet = snippetElement.textContent.trim();
+
+                    const [authors, journalInfo] = info.split(' - ');
+                    const [journal, year, publisher] = (journalInfo || '').split(', ');
+
+                    results.push({
+                        title,
+                        authors,
+                        journal: journal || '',
+                        year: year || '',
+                        publisher: publisher || '',
+                        snippet
+                    });
+                }
+            });
+
+            return results;
+        }
+
+        function displayResults(results) {
+            let tableHTML = `
+                <table>
+                    <tr>
+                        <th>Title</th>
+                        <th>Authors</th>
+                        <th>Journal</th>
+                        <th>Year</th>
+                        <th>Publisher</th>
+                        <th>Snippet</th>
+                    </tr>
+            `;
+
+            results.forEach(result => {
+                tableHTML += `
+                    <tr>
+                        <td>${result.title}</td>
+                        <td>${result.authors}</td>
+                        <td>${result.journal}</td>
+                        <td>${result.year}</td>
+                        <td>${result.publisher}</td>
+                        <td>${result.snippet}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</table>';
+            resultsDiv.innerHTML = tableHTML;
+
+            // Add download button
+            const downloadButton = document.createElement('button');
+            downloadButton.textContent = 'Download Results';
+            downloadButton.addEventListener('click', () => downloadResults(results));
+            resultsDiv.insertBefore(downloadButton, resultsDiv.firstChild);
+        }
+
+        function downloadResults(results) {
+            let csv = 'Title\tAuthors\tJournal\tYear\tPublisher\tSnippet\n';
+            results.forEach(result => {
+                csv += `${result.title}\t${result.authors}\t${result.journal}\t${result.year}\t${result.publisher}\t${result.snippet}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/tab-separated-values;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'google_scholar_results.tsv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+    </script>
+</body>
+</html>
